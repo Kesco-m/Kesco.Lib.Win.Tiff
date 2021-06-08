@@ -1086,6 +1086,50 @@ namespace Kesco.Lib.Win.Tiff
 		}
 
 		/// <summary>
+		/// Конвертация изображения в указаный PixelFormat
+		/// После конвертации исходное изображение уничтожается
+		/// </summary>
+		/// <param name="format">требуемый PixelFormat</param>
+		/// <param name="image">исходное изображение</param>
+		/// <returns>Изображение в указаном PixelFormat</returns>
+		public Bitmap ConvertTo(PixelFormat format, Bitmap image)
+		{
+			Bitmap result = image;
+			if(format == PixelFormat.Format1bppIndexed && image.PixelFormat != PixelFormat.Format1bppIndexed)
+			{
+				result = ConvertToBitonal(image);
+				image = null;
+			}
+			else if(format == PixelFormat.Format8bppIndexed && (image.PixelFormat != PixelFormat.Format8bppIndexed || !IsPalleteGrayscale(image.Palette)))
+			{
+				result = ConvertToGrayscale(image);
+			}
+			if(result == null)
+				result = image;
+			else
+				if(!result.Equals(image)&& image != null)
+					image.Dispose();
+
+			return result;
+		}
+
+		/// <summary>
+		/// Проверка является ли политра отенками серого
+		/// </summary>
+		/// <param name="colorPalette">Политра для проверки</param>
+		/// <returns></returns>
+		public bool IsPalleteGrayscale(ColorPalette colorPalette)
+		{
+			if((colorPalette.Flags & (int)PaletteFlags.GrayScale) == (int)PaletteFlags.GrayScale)
+				return true;
+
+			for(int i = 0; i < colorPalette.Entries.Length; i++)
+				if(colorPalette.Entries[i].B != colorPalette.Entries[i].R || colorPalette.Entries[i].G != colorPalette.Entries[i].R)
+					return false;
+			return true;
+		}
+
+		/// <summary>
 		/// Открывает файл с рисунком
 		/// </summary>
 		public Bitmap TryOpenFile(string fileName)
@@ -3551,22 +3595,22 @@ namespace Kesco.Lib.Win.Tiff
 		}
 
 		[DllImport(libTiff, SetLastError = true, CharSet = CharSet.Unicode, CallingConvention = CallingConvention.Cdecl)]
-		private static extern bool TIFFCopyFilePages(string input, string output, [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.U2, SizeParamIndex = 5)]ushort[ ] pages, ushort pLenght, [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.U2, SizeParamIndex = 5)]ushort[ ] colorPages, ushort clength, ushort compression);
+		private static extern bool TIFFCopyFilePages(string input, string output, [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.U2, SizeParamIndex = 5)]ushort[ ] pages, ushort pLenght, [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.U2, SizeParamIndex = 5)]ushort[ ] colorPages, ushort clength, ushort compression, int saveNotes);
 
-		public bool TIFCopyFile(string input, string output, ushort[ ] pages, ushort[ ] colorPages, int compression)
+		public bool TIFCopyFile(string input, string output, ushort[] pages, ushort[] colorPages, int compression, bool saveNotes)
 		{
 			if(pages.Length < 1)
 				return false;
 			if(colorPages != null)
-				return TIFFCopyFilePages(input, output, pages, (ushort)pages.Length, colorPages, (ushort)colorPages.Length, (ushort)compression);
+				return TIFFCopyFilePages(input, output, pages, (ushort)pages.Length, colorPages, (ushort)colorPages.Length, (ushort)compression, saveNotes ? 1 : 0);
 			else
-				return TIFFCopyFilePages(input, output, pages, (ushort)pages.Length, new ushort[0], (ushort)0, (ushort)compression);
+				return TIFFCopyFilePages(input, output, pages, (ushort)pages.Length, new ushort[0], (ushort)0, (ushort)compression, saveNotes ? 1 : 0);
 		}
 
 		[DllImport(libTiff, SetLastError = true, CharSet = CharSet.Unicode, CallingConvention=CallingConvention.Cdecl)]
 		private static extern bool TIFFCopyFileComp(string input, string output, ushort startPage, ushort length, [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.U2, SizeParamIndex = 5)]ushort[ ] colorPages, ushort clength, ushort compression);
 
-		public bool TIFCopyFile(string input, string output, ushort startPage, ushort length, ushort[ ] colorPages, int compression)
+		public bool TIFCopyFile(string input, string output, ushort startPage, ushort length, ushort[] colorPages, int compression)
 		{
 			if(colorPages != null)
 				return TIFFCopyFileComp(input, output, startPage, length, colorPages, (ushort)colorPages.Length, (ushort)compression);
@@ -4043,16 +4087,16 @@ namespace Kesco.Lib.Win.Tiff
 		}
 
 		[DllImport(libTiff, SetLastError = true, CharSet = CharSet.Unicode)]
-		private static extern bool TIFFCopyFilePages(string input, string output, [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.U2, SizeParamIndex = 5)]ushort[ ] pages, ushort pLenght, [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.U2, SizeParamIndex = 5)]ushort[ ] colorPages, ushort clength, ushort compression);
+		private static extern bool TIFFCopyFilePages(string input, string output, [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.U2, SizeParamIndex = 5)] ushort[] pages, ushort pLenght, [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.U2, SizeParamIndex = 5)] ushort[] colorPages, ushort clength, ushort compression, int saveNotes);
 
-		public bool TIFCopyFile(string input, string output, ushort[ ] pages, ushort[ ] colorPages, int compression)
+		public bool TIFCopyFile(string input, string output, ushort[] pages, ushort[] colorPages, int compression, bool saveNotes)
 		{
 			if(pages.Length < 1)
 				return false;
 			if(colorPages != null)
-				return TIFFCopyFilePages(input, output, pages, (ushort)pages.Length, colorPages, (ushort)colorPages.Length, (ushort)compression);
+				return TIFFCopyFilePages(input, output, pages, (ushort)pages.Length, colorPages, (ushort)colorPages.Length, (ushort)compression, saveNotes ? 1 : 0);
 			else
-				return TIFFCopyFilePages(input, output, pages, (ushort)pages.Length, new ushort[0], (ushort)0, (ushort)compression);
+				return TIFFCopyFilePages(input, output, pages, (ushort)pages.Length, new ushort[0], (ushort)0, (ushort)compression, saveNotes ? 1 : 0);
 		}
 
 		[DllImport(libTiff, SetLastError = true, CharSet = CharSet.Unicode)]
@@ -4521,7 +4565,7 @@ namespace Kesco.Lib.Win.Tiff
 
 		bool TIFCopyFile(string input, string output, ushort startPage, ushort length, ushort[] colorPages, int compression);
 
-		bool TIFCopyFile(string input, string output, ushort[] pages, ushort[] colorPages, int compression);
+		bool TIFCopyFile(string input, string output, ushort[] pages, ushort[] colorPages, int compression, bool saveNotes);
 
 		bool TIFReplacePage(string baseFile, string addFile, string output, ushort basePage, ushort length, ushort replacePage);
 		bool TIFReplacePage(string baseFile, string addFile, string output, ushort[] basePages, ushort length, ushort[] replacePages);
